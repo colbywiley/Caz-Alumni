@@ -56,6 +56,12 @@ export interface EventRsvpRow {
   created_at: string;
 }
 
+export interface FriendshipRow {
+  user_id: string;
+  friend_id: string;
+  created_at: string;
+}
+
 type TableShape<R> = {
   Row: R;
   Insert: Partial<R>;
@@ -70,6 +76,7 @@ export type Database = {
       alumni_roles: TableShape<AlumniRoleRow>;
       events: TableShape<EventRow>;
       event_rsvps: TableShape<EventRsvpRow>;
+      friendships: TableShape<FriendshipRow>;
       allowed_instruments: TableShape<{ name: string }>;
       allowed_staff_positions: TableShape<{ name: string }>;
     };
