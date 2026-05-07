@@ -3,6 +3,7 @@ import "./globals.css";
 import { SiteHeader } from "@/components/nav/SiteHeader";
 import { SiteFooter } from "@/components/nav/SiteFooter";
 import { getCurrentProfile } from "@/lib/auth";
+import { getRecentNotifications } from "@/lib/notifications";
 
 export const metadata: Metadata = {
   title: "Caz Alumni Connect",
@@ -12,6 +13,9 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const profile = await getCurrentProfile();
+  const { items: notifications, unreadCount } = profile
+    ? await getRecentNotifications()
+    : { items: [], unreadCount: 0 };
   return (
     <html lang="en">
       <head>
@@ -23,7 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body>
-        <SiteHeader profile={profile} />
+        <SiteHeader profile={profile} notifications={notifications} unreadCount={unreadCount} />
         <main className="min-h-[calc(100vh-220px)]">{children}</main>
         <SiteFooter />
       </body>

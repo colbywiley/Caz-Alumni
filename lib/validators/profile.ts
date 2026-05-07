@@ -49,6 +49,9 @@ export const profileSchema = z.object({
   instruments: z.array(z.enum(INSTRUMENTS as readonly [string, ...string[]])).default([]),
   show_in_directory: z.boolean(),
   share_email_in_directory: z.boolean(),
+  notify_on_friend_add: z.boolean(),
+  notify_on_photo_tag: z.boolean(),
+  notify_on_post_tag: z.boolean(),
   roles: z.array(roleSchema).max(3),
 });
 
