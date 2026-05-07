@@ -32,6 +32,9 @@ export async function saveProfileAction(input: ProfileInput) {
       instruments: data.instruments,
       show_in_directory: data.show_in_directory,
       share_email_in_directory: data.share_email_in_directory,
+      notify_on_friend_add: data.notify_on_friend_add,
+      notify_on_photo_tag: data.notify_on_photo_tag,
+      notify_on_post_tag: data.notify_on_post_tag,
     })
     .eq("id", user.id);
   if (profileErr) return { ok: false as const, error: profileErr.message };

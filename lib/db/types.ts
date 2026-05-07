@@ -3,6 +3,7 @@
 
 export type AlumniRoleEnum = "camper" | "staff" | "board";
 export type RsvpStatus = "going" | "not_going";
+export type NotificationType = "friend_added" | "photo_tag" | "post_tag";
 
 export interface ProfileRow {
   id: string;
@@ -18,9 +19,22 @@ export interface ProfileRow {
   instruments: string[];
   show_in_directory: boolean;
   share_email_in_directory: boolean;
+  notify_on_friend_add: boolean;
+  notify_on_photo_tag: boolean;
+  notify_on_post_tag: boolean;
   is_admin: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface NotificationRow {
+  id: string;
+  user_id: string;
+  actor_id: string | null;
+  type: NotificationType;
+  data: Record<string, unknown>;
+  read_at: string | null;
+  created_at: string;
 }
 
 export interface AlumniRoleRow {
@@ -77,6 +91,7 @@ export type Database = {
       events: TableShape<EventRow>;
       event_rsvps: TableShape<EventRsvpRow>;
       friendships: TableShape<FriendshipRow>;
+      notifications: TableShape<NotificationRow>;
       allowed_instruments: TableShape<{ name: string }>;
       allowed_staff_positions: TableShape<{ name: string }>;
     };

@@ -5,9 +5,17 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { NotificationsBell } from "@/components/notifications/NotificationsBell";
 import type { ProfileRow } from "@/lib/db/types";
+import type { NotificationFeedItem } from "@/lib/notifications";
 
-export function SiteHeader({ profile }: { profile: ProfileRow | null }) {
+type SiteHeaderProps = {
+  profile: ProfileRow | null;
+  notifications?: NotificationFeedItem[];
+  unreadCount?: number;
+};
+
+export function SiteHeader({ profile, notifications = [], unreadCount = 0 }: SiteHeaderProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -90,7 +98,10 @@ export function SiteHeader({ profile }: { profile: ProfileRow | null }) {
         <nav className="hidden items-center gap-1 text-sm md:flex">
           <NavLinks />
           {profile ? (
-            <LogoutButton />
+            <>
+              <NotificationsBell items={notifications} unreadCount={unreadCount} />
+              <LogoutButton />
+            </>
           ) : (
             <Link href="/login" className="btn btn-primary ml-2">
               Sign In
@@ -98,13 +109,17 @@ export function SiteHeader({ profile }: { profile: ProfileRow | null }) {
           )}
         </nav>
 
+        <div className="flex items-center gap-1 md:hidden">
+          {profile && (
+            <NotificationsBell items={notifications} unreadCount={unreadCount} />
+          )}
         <button
           type="button"
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
           aria-controls="site-mobile-menu"
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[var(--color-caz-line)] text-[var(--color-caz-green-darker)] hover:bg-[var(--color-caz-cream-soft)] md:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[var(--color-caz-line)] text-[var(--color-caz-green-darker)] hover:bg-[var(--color-caz-cream-soft)]"
         >
           {open ? (
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -116,6 +131,7 @@ export function SiteHeader({ profile }: { profile: ProfileRow | null }) {
             </svg>
           )}
         </button>
+        </div>
       </div>
 
       {open && (

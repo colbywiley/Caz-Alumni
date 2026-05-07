@@ -58,6 +58,9 @@ export function ProfileForm({ profile, roles }: Props) {
   const [instruments, setInstruments] = useState<string[]>(profile.instruments ?? []);
   const [showInDirectory, setShowInDirectory] = useState(profile.show_in_directory);
   const [shareEmail, setShareEmail] = useState(profile.share_email_in_directory);
+  const [notifyOnFriendAdd, setNotifyOnFriendAdd] = useState(profile.notify_on_friend_add);
+  const [notifyOnPhotoTag, setNotifyOnPhotoTag] = useState(profile.notify_on_photo_tag);
+  const [notifyOnPostTag, setNotifyOnPostTag] = useState(profile.notify_on_post_tag);
   const [activeRoles, setActiveRoles] = useState<Record<AlumniRoleValue, RoleState | null>>({
     camper: initialRoleMap.get("camper") ?? null,
     staff: initialRoleMap.get("staff") ?? null,
@@ -98,6 +101,9 @@ export function ProfileForm({ profile, roles }: Props) {
       instruments,
       show_in_directory: showInDirectory,
       share_email_in_directory: shareEmail,
+      notify_on_friend_add: notifyOnFriendAdd,
+      notify_on_photo_tag: notifyOnPhotoTag,
+      notify_on_post_tag: notifyOnPostTag,
       roles: rolesArray,
     };
 
@@ -215,6 +221,59 @@ export function ProfileForm({ profile, roles }: Props) {
             onChange={setInstruments}
             placeholder="Add instruments…"
           />
+        </div>
+      </section>
+
+      {/* Notifications */}
+      <section className="card p-6">
+        <h2 className="text-xl">Email notifications</h2>
+        <p className="mt-1 text-sm text-[var(--color-caz-muted)]">
+          Choose which activity should send you an email. You&apos;ll always see these in
+          the bell menu at the top of the page.
+        </p>
+        <div className="mt-4 space-y-3">
+          <label className="flex items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 accent-[var(--color-caz-green)]"
+              checked={notifyOnFriendAdd}
+              onChange={(e) => setNotifyOnFriendAdd(e.target.checked)}
+            />
+            <span>
+              <span className="font-semibold">Email me when someone adds me as a friend</span>
+              <span className="block text-[var(--color-caz-muted)]">
+                We&apos;ll send a quick note with a link to their profile.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 accent-[var(--color-caz-green)]"
+              checked={notifyOnPhotoTag}
+              onChange={(e) => setNotifyOnPhotoTag(e.target.checked)}
+            />
+            <span>
+              <span className="font-semibold">Email me when someone tags me in a photo</span>
+              <span className="block text-[var(--color-caz-muted)]">
+                Photo tagging is coming soon.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 accent-[var(--color-caz-green)]"
+              checked={notifyOnPostTag}
+              onChange={(e) => setNotifyOnPostTag(e.target.checked)}
+            />
+            <span>
+              <span className="font-semibold">Email me when someone tags me in a post</span>
+              <span className="block text-[var(--color-caz-muted)]">
+                Post tagging is coming soon.
+              </span>
+            </span>
+          </label>
         </div>
       </section>
 
