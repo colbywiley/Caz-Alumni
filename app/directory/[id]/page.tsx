@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ROLE_LABEL } from "@/lib/constants/picklists";
 import { formatYearRange, initialsFromName } from "@/lib/utils";
 import { AddFriendButton } from "@/components/directory/AddFriendButton";
+import { FriendsList } from "@/components/directory/FriendsList";
 import type { AlumniRoleRow, FriendshipRow, ProfileRow } from "@/lib/db/types";
 
 type Params = Promise<{ id: string }>;
@@ -147,40 +147,14 @@ export default async function AlumProfilePage({ params }: { params: Params }) {
           {viewer && (
             <div className="mt-8">
               <h2 className="text-lg">Friends</h2>
-              {friends.length === 0 ? (
-                <p className="mt-2 text-sm text-[var(--color-caz-muted)]">
-                  {viewer.id === profile.id
+              <FriendsList
+                friends={friends}
+                emptyMessage={
+                  viewer.id === profile.id
                     ? "You haven't added any friends yet. Visit the directory to add some."
-                    : "No friends added yet."}
-                </p>
-              ) : (
-                <ul className="mt-3 grid gap-3 sm:grid-cols-2">
-                  {friends.map((f) => {
-                    const fName = f.display_name || f.full_name || "Caz Alum";
-                    return (
-                      <li key={f.id}>
-                        <Link
-                          href={`/directory/${f.id}`}
-                          className="card flex items-center gap-3 p-3 transition hover:shadow-md"
-                        >
-                          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[var(--color-caz-cream-soft)]">
-                            {f.avatar_url ? (
-                              <Image src={f.avatar_url} alt="" fill sizes="40px" className="object-cover" />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-[var(--color-caz-green-darker)]">
-                                {initialsFromName(fName)}
-                              </div>
-                            )}
-                          </div>
-                          <span className="truncate text-sm font-semibold text-[var(--color-caz-green-darker)]">
-                            {fName}
-                          </span>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+                    : "No friends added yet."
+                }
+              />
             </div>
           )}
         </div>
