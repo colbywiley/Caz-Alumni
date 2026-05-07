@@ -3,7 +3,7 @@ import { DirectoryFilters } from "@/components/directory/DirectoryFilters";
 import { AlumniCard } from "@/components/directory/AlumniCard";
 import { InviteOthersButton } from "@/components/directory/InviteOthersButton";
 import { getCurrentUser } from "@/lib/auth";
-import type { AlumniRoleRow, ProfileRow } from "@/lib/db/types";
+import type { AlumniRoleRow, FriendshipRow, ProfileRow } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +34,17 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Se
     const arr = rolesByProfile.get(r.profile_id) ?? [];
     arr.push(r);
     rolesByProfile.set(r.profile_id, arr);
+  }
+
+  const friendIds = new Set<string>();
+  if (currentUser) {
+    const { data: friendsRaw } = await supabase
+      .from("friendships")
+      .select("friend_id")
+      .eq("user_id", currentUser.id);
+    for (const row of (friendsRaw ?? []) as Pick<FriendshipRow, "friend_id">[]) {
+      friendIds.add(row.friend_id);
+    }
   }
 
   // Filters (server-side)
@@ -86,6 +97,8 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Se
               key={p.id}
               profile={p}
               roles={rolesByProfile.get(p.id) ?? []}
+              showFriendButton={!!currentUser && currentUser.id !== p.id}
+              isFriend={friendIds.has(p.id)}
             />
           ))}
         </div>
