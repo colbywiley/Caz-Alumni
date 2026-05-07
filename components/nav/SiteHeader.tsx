@@ -28,6 +28,14 @@ export function SiteHeader({ profile }: { profile: ProfileRow | null }) {
           <Link href="/events" className="rounded px-3 py-2 font-medium text-[var(--color-caz-ink)] hover:bg-[var(--color-caz-cream-soft)]">
             Events
           </Link>
+          <a
+            href="https://cazadero.secure.nonprofitsoapbox.com/donate"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded px-3 py-2 font-medium text-[var(--color-caz-gold)] hover:bg-[var(--color-caz-cream-soft)]"
+          >
+            Donate
+          </a>
           {profile && (
             <Link href="/profile" className="rounded px-3 py-2 font-medium text-[var(--color-caz-ink)] hover:bg-[var(--color-caz-cream-soft)]">
               My Profile
