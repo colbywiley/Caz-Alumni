@@ -6,6 +6,8 @@ import { renderInviteEmail } from "@/lib/email/inviteTemplate";
 
 export const runtime = "nodejs";
 
+type SendResult = { email: string; ok: boolean; error?: string };
+
 export async function POST(request: Request) {
   const profile = await getCurrentProfile();
   if (!profile) {
@@ -24,7 +26,7 @@ export async function POST(request: Request) {
     const message = parsed.error.issues[0]?.message ?? "Invalid input.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
-  const { email, note } = parsed.data;
+  const { emails, note } = parsed.data;
 
   const apiKey = process.env.RESEND_API_KEY;
   const fromAddress = process.env.INVITE_FROM_EMAIL;
@@ -37,43 +39,51 @@ export async function POST(request: Request) {
   }
 
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
-  const joinUrl = `${siteUrl}/login?invite=1&email=${encodeURIComponent(email)}`;
   const inviterName = profile.display_name || profile.full_name || "A Caz alum";
-
-  const { subject, html, text } = renderInviteEmail({
-    inviterName,
-    inviterEmail: profile.email ?? null,
-    note,
-    joinUrl,
-    siteUrl,
-  });
-
-  const resend = new Resend(apiKey);
   const replyTo = profile.email ?? undefined;
+  const resend = new Resend(apiKey);
 
-  try {
-    const { error } = await resend.emails.send({
-      from: fromAddress,
-      to: email,
-      subject,
-      html,
-      text,
-      replyTo,
-    });
-    if (error) {
-      console.error("Resend send error:", error);
-      return NextResponse.json(
-        { error: "We couldn't send that invite. Please try again in a moment." },
-        { status: 502 },
-      );
-    }
-  } catch (err) {
-    console.error("Resend threw:", err);
+  const results: SendResult[] = await Promise.all(
+    emails.map(async (email): Promise<SendResult> => {
+      const joinUrl = `${siteUrl}/login?invite=1&email=${encodeURIComponent(email)}`;
+      const { subject, html, text } = renderInviteEmail({
+        inviterName,
+        inviterEmail: profile.email ?? null,
+        note,
+        joinUrl,
+        siteUrl,
+      });
+
+      try {
+        const { error } = await resend.emails.send({
+          from: fromAddress,
+          to: email,
+          subject,
+          html,
+          text,
+          replyTo,
+        });
+        if (error) {
+          console.error(`Resend send error for ${email}:`, error);
+          return { email, ok: false, error: error.message ?? "Send failed" };
+        }
+        return { email, ok: true };
+      } catch (err) {
+        console.error(`Resend threw for ${email}:`, err);
+        return { email, ok: false, error: "Send failed" };
+      }
+    }),
+  );
+
+  const sent = results.filter((r) => r.ok).map((r) => r.email);
+  const failed = results.filter((r) => !r.ok);
+
+  if (sent.length === 0) {
     return NextResponse.json(
-      { error: "We couldn't send that invite. Please try again in a moment." },
+      { error: "We couldn't send any of those invitations. Please try again in a moment.", failed },
       { status: 502 },
     );
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, sent, failed });
 }

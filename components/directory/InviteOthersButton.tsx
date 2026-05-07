@@ -1,22 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { MAX_INVITES_PER_REQUEST, parseEmailList } from "@/lib/validators/invite";
+
+type FailedRecipient = { email: string; error?: string };
 
 type Status =
   | { kind: "idle" }
   | { kind: "sending" }
-  | { kind: "success"; email: string }
+  | { kind: "success"; sent: string[]; failed: FailedRecipient[] }
   | { kind: "error"; message: string };
 
 const NOTE_MAX = 500;
 
 export function InviteOthersButton() {
   const [open, setOpen] = useState(false);
-  const [email, setEmail] = useState("");
+  const [emailsInput, setEmailsInput] = useState("");
   const [note, setNote] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const dialogRef = useRef<HTMLDivElement>(null);
-  const emailInputRef = useRef<HTMLInputElement>(null);
+  const emailInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -34,7 +37,7 @@ export function InviteOthersButton() {
   }, [open]);
 
   function reset() {
-    setEmail("");
+    setEmailsInput("");
     setNote("");
     setStatus({ kind: "idle" });
   }
@@ -44,29 +47,58 @@ export function InviteOthersButton() {
     setTimeout(reset, 150);
   }
 
+  const { valid: parsedEmails, invalid: invalidTokens } = parseEmailList(emailsInput);
+  const tooMany = parsedEmails.length > MAX_INVITES_PER_REQUEST;
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (status.kind === "sending") return;
-    setStatus({ kind: "sending" });
 
+    if (parsedEmails.length === 0) {
+      setStatus({ kind: "error", message: "Please enter at least one valid email address." });
+      return;
+    }
+    if (invalidTokens.length > 0) {
+      setStatus({
+        kind: "error",
+        message: `These don't look like valid emails: ${invalidTokens.join(", ")}`,
+      });
+      return;
+    }
+    if (tooMany) {
+      setStatus({
+        kind: "error",
+        message: `You can invite up to ${MAX_INVITES_PER_REQUEST} people at a time.`,
+      });
+      return;
+    }
+
+    setStatus({ kind: "sending" });
     try {
       const res = await fetch("/api/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), note: note.trim() || undefined }),
+        body: JSON.stringify({ emails: parsedEmails, note: note.trim() || undefined }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        sent?: string[];
+        failed?: FailedRecipient[];
+      };
       if (!res.ok) {
         setStatus({ kind: "error", message: data.error ?? "Something went wrong. Please try again." });
         return;
       }
-      setStatus({ kind: "success", email: email.trim() });
-      setEmail("");
+      setStatus({ kind: "success", sent: data.sent ?? [], failed: data.failed ?? [] });
+      setEmailsInput("");
       setNote("");
     } catch {
       setStatus({ kind: "error", message: "Network error. Please try again." });
     }
   }
+
+  const submitDisabled =
+    status.kind === "sending" || parsedEmails.length === 0 || invalidTokens.length > 0 || tooMany;
 
   return (
     <>
@@ -104,13 +136,10 @@ export function InviteOthersButton() {
           }}
         >
           <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
-          <div
-            ref={dialogRef}
-            className="card relative z-10 w-full max-w-md p-6"
-          >
+          <div ref={dialogRef} className="card relative z-10 w-full max-w-md p-6">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <h2 id="invite-title" className="text-xl">Invite an alum</h2>
+                <h2 id="invite-title" className="text-xl">Invite alumni</h2>
                 <p className="mt-1 text-sm text-[var(--color-caz-muted)]">
                   Send a branded email invitation to join Caz Alumni Connect.
                 </p>
@@ -127,15 +156,42 @@ export function InviteOthersButton() {
 
             {status.kind === "success" ? (
               <div className="space-y-4">
-                <div
-                  role="status"
-                  className="rounded-lg border border-[var(--color-caz-line)] bg-[var(--color-caz-cream-soft)] p-4 text-sm"
-                >
-                  Invitation sent to <strong>{status.email}</strong>. Thanks for spreading the word!
-                </div>
+                {status.sent.length > 0 && (
+                  <div
+                    role="status"
+                    className="rounded-lg border border-[var(--color-caz-line)] bg-[var(--color-caz-cream-soft)] p-4 text-sm"
+                  >
+                    Sent {status.sent.length} invitation{status.sent.length === 1 ? "" : "s"} to:
+                    <ul className="mt-2 list-disc pl-5">
+                      {status.sent.map((e) => (
+                        <li key={e}>{e}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {status.failed.length > 0 && (
+                  <div
+                    role="alert"
+                    className="rounded-lg border border-[#e6b3b3] bg-[#fdecec] p-3 text-sm text-[#8a2727]"
+                  >
+                    Couldn&apos;t send to:
+                    <ul className="mt-2 list-disc pl-5">
+                      {status.failed.map((f) => (
+                        <li key={f.email}>
+                          {f.email}
+                          {f.error ? ` — ${f.error}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <div className="flex justify-end gap-2">
-                  <button type="button" className="btn btn-secondary" onClick={() => setStatus({ kind: "idle" })}>
-                    Send another
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setStatus({ kind: "idle" })}
+                  >
+                    Send more
                   </button>
                   <button type="button" className="btn btn-primary" onClick={close}>
                     Done
@@ -145,24 +201,45 @@ export function InviteOthersButton() {
             ) : (
               <form onSubmit={onSubmit} className="space-y-4" noValidate>
                 <div>
-                  <label className="label" htmlFor="invite-email">
-                    Email address
+                  <label className="label" htmlFor="invite-emails">
+                    Email addresses
                   </label>
-                  <input
+                  <textarea
                     ref={emailInputRef}
-                    id="invite-email"
-                    type="email"
+                    id="invite-emails"
                     required
-                    className="input"
-                    placeholder="friend@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    rows={3}
+                    className="textarea"
+                    placeholder="friend@example.com, another@example.com"
+                    value={emailsInput}
+                    onChange={(e) => setEmailsInput(e.target.value)}
                     disabled={status.kind === "sending"}
                   />
+                  <div className="help">
+                    Separate multiple emails with commas or spaces. Up to {MAX_INVITES_PER_REQUEST} at a time.
+                    {parsedEmails.length > 0 && (
+                      <>
+                        {" "}
+                        <span className="text-[var(--color-caz-green-dark)]">
+                          {parsedEmails.length} valid
+                        </span>
+                        {invalidTokens.length > 0 && (
+                          <>
+                            ,{" "}
+                            <span className="text-[#8a2727]">
+                              {invalidTokens.length} invalid
+                            </span>
+                          </>
+                        )}
+                        .
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="label" htmlFor="invite-note">
-                    Personal note <span className="font-normal text-[var(--color-caz-muted)]">(optional)</span>
+                    Personal note{" "}
+                    <span className="font-normal text-[var(--color-caz-muted)]">(optional)</span>
                   </label>
                   <textarea
                     id="invite-note"
@@ -196,12 +273,12 @@ export function InviteOthersButton() {
                   >
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={status.kind === "sending" || email.trim().length === 0}
-                  >
-                    {status.kind === "sending" ? "Sending…" : "Send invitation"}
+                  <button type="submit" className="btn btn-primary" disabled={submitDisabled}>
+                    {status.kind === "sending"
+                      ? "Sending…"
+                      : parsedEmails.length > 1
+                      ? `Send ${parsedEmails.length} invitations`
+                      : "Send invitation"}
                   </button>
                 </div>
               </form>
