@@ -1,6 +1,8 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DirectoryFilters } from "@/components/directory/DirectoryFilters";
 import { AlumniCard } from "@/components/directory/AlumniCard";
+import { InviteOthersButton } from "@/components/directory/InviteOthersButton";
+import { getCurrentUser } from "@/lib/auth";
 import type { AlumniRoleRow, ProfileRow } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +14,7 @@ type SearchParams = Promise<{ q?: string; role?: string; decade?: string; instru
 export default async function DirectoryPage({ searchParams }: { searchParams: SearchParams }) {
   const supabase = await createSupabaseServerClient();
   const params = await searchParams;
+  const currentUser = await getCurrentUser();
 
   const { data: profilesRaw } = await supabase
     .from("profiles")
@@ -59,12 +62,15 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Se
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      <header className="mb-6">
-        <h1 className="text-3xl">Alumni Directory</h1>
-        <p className="mt-2 text-[var(--color-caz-muted)]">
-          Reconnect with fellow Caz alumni. Showing {filtered.length} of {profiles.length} alumni
-          who&apos;ve opted in.
-        </p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl">Alumni Directory</h1>
+          <p className="mt-2 text-[var(--color-caz-muted)]">
+            Reconnect with fellow Caz alumni. Showing {filtered.length} of {profiles.length} alumni
+            who&apos;ve opted in.
+          </p>
+        </div>
+        {currentUser && <InviteOthersButton />}
       </header>
 
       <DirectoryFilters />
