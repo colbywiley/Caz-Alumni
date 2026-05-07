@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { format } from "date-fns";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { formatEventDateTime } from "@/lib/utils";
 
 export default async function AdminEventsPage() {
   const supabase = await createSupabaseServerClient();
@@ -25,7 +25,7 @@ export default async function AdminEventsPage() {
               <div>
                 <div className="font-display text-lg">{e.title}</div>
                 <div className="text-sm text-[var(--color-caz-muted)]">
-                  {format(new Date(e.start_at), "PPpp")}
+                  {formatEventDateTime(e.start_at)}
                   {e.location ? ` · ${e.location}` : ""}
                 </div>
               </div>

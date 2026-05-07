@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { format } from "date-fns";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { formatEventDateTime, formatEventTime } from "@/lib/utils";
 import { RsvpButton } from "@/components/events/RsvpButton";
 import { AttendeeList } from "@/components/events/AttendeeList";
 import type { EventRow } from "@/lib/db/types";
@@ -68,11 +68,19 @@ export default async function EventDetailPage({ params }: { params: Params }) {
         </div>
         <div className="p-6 sm:p-8">
           <div className="text-sm font-semibold uppercase tracking-wider text-[var(--color-caz-gold)]">
-            {format(new Date(event.start_at), "EEEE, MMMM d, yyyy · p")}
+            {formatEventDateTime(event.start_at, {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+              timeZoneName: "short",
+            })}
             {event.end_at && (
               <>
                 <span className="mx-1.5 text-[var(--color-caz-muted)]">→</span>
-                {format(new Date(event.end_at), "p")}
+                {formatEventTime(event.end_at)}
               </>
             )}
           </div>

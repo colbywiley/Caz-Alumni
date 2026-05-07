@@ -5,16 +5,48 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { saveEventAction } from "@/app/admin/events/actions";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { EVENT_TIME_ZONE } from "@/lib/utils";
 import type { EventRow } from "@/lib/db/types";
 
 type Props = { event?: EventRow };
 
-function toLocalInput(iso: string | null): string {
+function getZoneOffsetMs(date: Date, timeZone: string): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = dtf.formatToParts(date).reduce<Record<string, string>>((acc, p) => {
+    if (p.type !== "literal") acc[p.type] = p.value;
+    return acc;
+  }, {});
+  const asUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  return asUtc - date.getTime();
+}
+
+function toZonedInput(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
-  const off = d.getTimezoneOffset();
-  const local = new Date(d.getTime() - off * 60000);
-  return local.toISOString().slice(0, 16);
+  const offset = getZoneOffsetMs(d, EVENT_TIME_ZONE);
+  return new Date(d.getTime() + offset).toISOString().slice(0, 16);
+}
+
+function fromZonedInput(local: string): string {
+  const naive = new Date(`${local}:00Z`);
+  const offset = getZoneOffsetMs(naive, EVENT_TIME_ZONE);
+  return new Date(naive.getTime() - offset).toISOString();
 }
 
 export function EventForm({ event }: Props) {
@@ -23,8 +55,8 @@ export function EventForm({ event }: Props) {
   const [title, setTitle] = useState(event?.title ?? "");
   const [description, setDescription] = useState(event?.description ?? "");
   const [location, setLocation] = useState(event?.location ?? "");
-  const [startAt, setStartAt] = useState(toLocalInput(event?.start_at ?? null));
-  const [endAt, setEndAt] = useState(toLocalInput(event?.end_at ?? null));
+  const [startAt, setStartAt] = useState(toZonedInput(event?.start_at ?? null));
+  const [endAt, setEndAt] = useState(toZonedInput(event?.end_at ?? null));
   const [externalUrl, setExternalUrl] = useState(event?.external_url ?? "");
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(event?.cover_image_url ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -63,8 +95,8 @@ export function EventForm({ event }: Props) {
         title: title.trim(),
         description: description.trim() || null,
         location: location.trim() || null,
-        start_at: new Date(startAt).toISOString(),
-        end_at: endAt ? new Date(endAt).toISOString() : null,
+        start_at: fromZonedInput(startAt),
+        end_at: endAt ? fromZonedInput(endAt) : null,
         external_url: externalUrl.trim() || null,
         cover_image_url: coverImageUrl,
       });
@@ -85,11 +117,11 @@ export function EventForm({ event }: Props) {
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="label" htmlFor="start_at">Start *</label>
+          <label className="label" htmlFor="start_at">Start * <span className="text-xs font-normal text-[var(--color-caz-muted)]">(Pacific Time)</span></label>
           <input id="start_at" type="datetime-local" className="input" required value={startAt} onChange={(e) => setStartAt(e.target.value)} />
         </div>
         <div>
-          <label className="label" htmlFor="end_at">End (optional)</label>
+          <label className="label" htmlFor="end_at">End (optional) <span className="text-xs font-normal text-[var(--color-caz-muted)]">(Pacific Time)</span></label>
           <input id="end_at" type="datetime-local" className="input" value={endAt} onChange={(e) => setEndAt(e.target.value)} />
         </div>
       </div>
