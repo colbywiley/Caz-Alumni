@@ -52,6 +52,11 @@ export function SiteHeader({ profile, notifications = [], unreadCount = 0 }: Sit
         <Link href="/directory" onClick={onNavigate} className={`${linkBase} text-[var(--color-caz-ink)]`}>
           Directory
         </Link>
+        {profile && (
+          <Link href="/feed" onClick={onNavigate} className={`${linkBase} text-[var(--color-caz-ink)]`}>
+            Feed
+          </Link>
+        )}
         <Link href="/events" onClick={onNavigate} className={`${linkBase} text-[var(--color-caz-ink)]`}>
           Events
         </Link>
