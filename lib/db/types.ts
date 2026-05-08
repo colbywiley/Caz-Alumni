@@ -3,7 +3,11 @@
 
 export type AlumniRoleEnum = "camper" | "staff" | "board";
 export type RsvpStatus = "going" | "not_going";
-export type NotificationType = "friend_added" | "photo_tag" | "post_tag";
+export type NotificationType =
+  | "friend_added"
+  | "photo_tag"
+  | "post_tag"
+  | "comment_tag";
 
 export interface ProfileRow {
   id: string;
@@ -76,6 +80,29 @@ export interface FriendshipRow {
   created_at: string;
 }
 
+export interface FeedPostRow {
+  id: string;
+  author_id: string;
+  content: string;
+  image_urls: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeedPostLikeRow {
+  post_id: string;
+  profile_id: string;
+  created_at: string;
+}
+
+export interface FeedPostCommentRow {
+  id: string;
+  post_id: string;
+  author_id: string;
+  content: string;
+  created_at: string;
+}
+
 type TableShape<R> = {
   Row: R;
   Insert: Partial<R>;
@@ -91,6 +118,9 @@ export type Database = {
       events: TableShape<EventRow>;
       event_rsvps: TableShape<EventRsvpRow>;
       friendships: TableShape<FriendshipRow>;
+      feed_posts: TableShape<FeedPostRow>;
+      feed_post_likes: TableShape<FeedPostLikeRow>;
+      feed_post_comments: TableShape<FeedPostCommentRow>;
       notifications: TableShape<NotificationRow>;
       allowed_instruments: TableShape<{ name: string }>;
       allowed_staff_positions: TableShape<{ name: string }>;

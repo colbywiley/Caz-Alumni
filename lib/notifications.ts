@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type NotificationFeedItem = {
   id: string;
-  type: "friend_added" | "photo_tag" | "post_tag";
+  type: "friend_added" | "photo_tag" | "post_tag" | "comment_tag";
   read: boolean;
   createdAt: string;
   title: string;
@@ -59,6 +59,8 @@ export async function getRecentNotifications(): Promise<{
       (typeof data.actor_name === "string" && data.actor_name) || "Someone";
     const actorName = actor?.name ?? fallbackName;
 
+    const postId = typeof data.post_id === "string" ? data.post_id : null;
+
     let title: string;
     let href: string | null;
     switch (row.type) {
@@ -71,8 +73,12 @@ export async function getRecentNotifications(): Promise<{
         href = actor ? `/directory/${actor.id}` : null;
         break;
       case "post_tag":
-        title = `${actorName} tagged you in a post`;
-        href = actor ? `/directory/${actor.id}` : null;
+        title = `${actorName} mentioned you in a post`;
+        href = postId ? `/feed#post-${postId}` : "/feed";
+        break;
+      case "comment_tag":
+        title = `${actorName} mentioned you in a comment`;
+        href = postId ? `/feed#post-${postId}` : "/feed";
         break;
       default:
         title = "New notification";
