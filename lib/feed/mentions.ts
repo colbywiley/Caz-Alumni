@@ -64,3 +64,33 @@ export function buildMentionMarker(profileId: string, name: string): string {
 export function mentionsToPlainText(content: string): string {
   return content.replace(MENTION_RE, (_full, name: string) => `@${name}`);
 }
+
+// Composer-side helper. The textarea holds plain `@Display Name` text plus a
+// sidecar list of resolved mentions; on submit we walk each tracked mention
+// and rewrite its `@Name` occurrences to the canonical `@[Name](uuid)` form.
+// Names are sorted longest-first so a name like "John" never eats the start of
+// "Johnny" before its own replacement runs.
+export function composeMentions(
+  text: string,
+  mentions: ReadonlyArray<{ profileId: string; name: string }>,
+): string {
+  if (mentions.length === 0) return text;
+  const sorted = [...mentions].sort((a, b) => b.name.length - a.name.length);
+  let out = text;
+  for (const m of sorted) {
+    const escName = m.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // Match `@Name` only when the next char isn't a continuation of the word
+    // — so `@Tester` won't get rewritten as `@Test` + "er".
+    const re = new RegExp(`@${escName}(?![A-Za-z0-9])`, "g");
+    out = out.replace(re, () => buildMentionMarker(m.profileId, m.name));
+  }
+  return out;
+}
+
+// Returns true if `@Name` (followed by a non-word char or end) still appears
+// somewhere in `text`. Used by the composer to drop mentions that the user
+// edited away.
+export function mentionStillPresent(text: string, name: string): boolean {
+  const escName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`@${escName}(?![A-Za-z0-9])`).test(text);
+}
