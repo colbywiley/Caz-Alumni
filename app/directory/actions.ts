@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { renderFriendAddedEmail } from "@/lib/email/friendAddedTemplate";
+import { getSiteUrl } from "@/lib/siteUrl";
 
 export async function addFriendAction(friendId: string) {
   const supabase = await createSupabaseServerClient();
@@ -103,7 +104,7 @@ async function notifyFriendAdded(actorId: string, recipientId: string) {
   }
   if (!recipient.email) return;
 
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const siteUrl = getSiteUrl();
   const profileUrl = `${siteUrl}/directory/${actor.id}`;
   const frienderName = actor.display_name || actor.full_name || "A Caz alum";
   const recipientName = recipient.display_name || recipient.full_name || "there";

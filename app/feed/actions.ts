@@ -5,6 +5,7 @@ import { Resend } from "resend";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { extractMentionedProfileIds, mentionsToPlainText } from "@/lib/feed/mentions";
 import { renderPostMentionEmail } from "@/lib/email/postMentionTemplate";
+import { getSiteUrl } from "@/lib/siteUrl";
 
 const MAX_CONTENT = 4000;
 const MAX_IMAGES = 4;
@@ -253,7 +254,7 @@ async function notifyMentions(args: {
     return;
   }
 
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const siteUrl = getSiteUrl();
   const postUrl = `${siteUrl}/feed#post-${args.postId}`;
   const actorName = actor.display_name || actor.full_name || "A Caz alum";
   const preview = mentionsToPlainText(args.content);
