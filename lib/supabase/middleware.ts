@@ -5,6 +5,36 @@ const PROTECTED_PREFIXES = ["/profile", "/directory", "/events", "/admin"];
 const ADMIN_PREFIX = "/admin";
 
 export async function updateSession(request: NextRequest) {
+  // Supabase's magic-link / OAuth flow sometimes lands users at the bare site
+  // URL with `?code=...` (when our `redirectTo` isn't in the project's allow-
+  // list, Supabase falls back to the Site URL). Forward those requests to
+  // `/auth/callback` so the session exchange always runs.
+  const incoming = request.nextUrl;
+  if (
+    incoming.searchParams.has("code") &&
+    incoming.pathname !== "/auth/callback"
+  ) {
+    const forward = incoming.clone();
+    if (!forward.searchParams.has("next")) {
+      const fallback =
+        incoming.pathname === "/" ? "/feed" : incoming.pathname;
+      forward.searchParams.set("next", fallback);
+    }
+    forward.pathname = "/auth/callback";
+    return NextResponse.redirect(forward);
+  }
+
+  // Likewise surface Supabase auth errors on /login instead of leaving them
+  // as ugly query params on the landing page.
+  if (
+    incoming.searchParams.has("error_code") &&
+    incoming.pathname !== "/login"
+  ) {
+    const forward = incoming.clone();
+    forward.pathname = "/login";
+    return NextResponse.redirect(forward);
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
