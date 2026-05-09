@@ -5,7 +5,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createPostAction } from "@/app/feed/actions";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { MentionTextarea } from "./MentionTextarea";
+import { composeMentions } from "@/lib/feed/mentions";
+import { MentionTextarea, type DraftMention } from "./MentionTextarea";
 
 const MAX_IMAGES = 4;
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -17,6 +18,7 @@ type Props = {
 export function FeedComposer({ currentUserId }: Props) {
   const router = useRouter();
   const [content, setContent] = useState("");
+  const [mentions, setMentions] = useState<DraftMention[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,9 +84,10 @@ export function FeedComposer({ currentUserId }: Props) {
       setError("Add some text or a photo.");
       return;
     }
+    const canonical = composeMentions(content, mentions);
     startTransition(async () => {
       const res = await createPostAction({
-        content: content,
+        content: canonical,
         image_urls: images,
       });
       if (!res.ok) {
@@ -92,6 +95,7 @@ export function FeedComposer({ currentUserId }: Props) {
         return;
       }
       setContent("");
+      setMentions([]);
       setImages([]);
       router.refresh();
     });
@@ -103,7 +107,11 @@ export function FeedComposer({ currentUserId }: Props) {
     <section className="card p-4 sm:p-5">
       <MentionTextarea
         value={content}
-        onChange={setContent}
+        mentions={mentions}
+        onChange={(text, m) => {
+          setContent(text);
+          setMentions(m);
+        }}
         placeholder="Share something with the alumni community… use @ to mention someone."
         rows={4}
         minHeight={120}

@@ -10,8 +10,9 @@ import {
   deletePostAction,
   togglePostLikeAction,
 } from "@/app/feed/actions";
+import { composeMentions } from "@/lib/feed/mentions";
 import { MentionContent } from "./MentionContent";
-import { MentionTextarea } from "./MentionTextarea";
+import { MentionTextarea, type DraftMention } from "./MentionTextarea";
 
 export type PostCardData = {
   id: string;
@@ -82,6 +83,7 @@ export function PostCard({
   const [optimisticCount, setOptimisticCount] = useState(post.likeCount);
   const [showCommentBox, setShowCommentBox] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
+  const [commentMentions, setCommentMentions] = useState<DraftMention[]>([]);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [postError, setPostError] = useState<string | null>(null);
 
@@ -107,16 +109,18 @@ export function PostCard({
   function submitComment() {
     setCommentError(null);
     if (commentDraft.trim().length === 0) return;
+    const canonical = composeMentions(commentDraft, commentMentions);
     startTransition(async () => {
       const res = await createCommentAction({
         postId: post.id,
-        content: commentDraft,
+        content: canonical,
       });
       if (!res.ok) {
         setCommentError(res.error);
         return;
       }
       setCommentDraft("");
+      setCommentMentions([]);
       setShowCommentBox(false);
       router.refresh();
     });
@@ -303,7 +307,11 @@ export function PostCard({
             <li>
               <MentionTextarea
                 value={commentDraft}
-                onChange={setCommentDraft}
+                mentions={commentMentions}
+                onChange={(text, m) => {
+                  setCommentDraft(text);
+                  setCommentMentions(m);
+                }}
                 placeholder="Write a comment… use @ to mention someone."
                 rows={2}
                 minHeight={56}
@@ -316,6 +324,7 @@ export function PostCard({
                   onClick={() => {
                     setShowCommentBox(false);
                     setCommentDraft("");
+                    setCommentMentions([]);
                     setCommentError(null);
                   }}
                   disabled={pending}

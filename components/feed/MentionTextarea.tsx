@@ -11,7 +11,9 @@ import {
 } from "react";
 import Image from "next/image";
 import { searchProfilesForMentionAction } from "@/app/feed/actions";
-import { buildMentionMarker, parseMentionTokens } from "@/lib/feed/mentions";
+import { mentionStillPresent, sanitizeMentionName } from "@/lib/feed/mentions";
+
+export type DraftMention = { profileId: string; name: string };
 
 type Suggestion = {
   id: string;
@@ -21,30 +23,30 @@ type Suggestion = {
 
 type Props = {
   value: string;
-  onChange: (next: string) => void;
+  mentions: DraftMention[];
+  onChange: (text: string, mentions: DraftMention[]) => void;
   placeholder?: string;
   rows?: number;
   minHeight?: number;
   className?: string;
-  // Disables the underlying textarea while still letting the suggestion
-  // dropdown stay alive — used during submit.
   disabled?: boolean;
-  // Optional small footnote rendered under the textarea.
   hint?: string;
 };
 
-// Detect whether the caret is currently in an "@…" trigger context. We require
-// the @ to be the start of the line or preceded by whitespace, and the term to
-// not contain spaces yet.
-function detectTrigger(value: string, caret: number): { start: number; query: string } | null {
+// Detect whether the caret sits inside an "@…" trigger. The @ must start the
+// line or follow whitespace, and the typed query so far must not contain any
+// whitespace yet.
+function detectTrigger(
+  value: string,
+  caret: number,
+): { start: number; query: string } | null {
   if (caret <= 0) return null;
-  // Walk backwards from caret to find the latest '@'.
   let i = caret - 1;
   while (i >= 0) {
     const ch = value[i];
     if (ch === "@") {
       const before = i === 0 ? " " : value[i - 1];
-      if (/\s|^/.test(before) || i === 0) {
+      if (i === 0 || /\s/.test(before)) {
         const query = value.slice(i + 1, caret);
         if (/\s/.test(query)) return null;
         if (query.length > 30) return null;
@@ -58,8 +60,13 @@ function detectTrigger(value: string, caret: number): { start: number; query: st
   return null;
 }
 
+function pruneMentions(text: string, list: DraftMention[]): DraftMention[] {
+  return list.filter((m) => mentionStillPresent(text, m.name));
+}
+
 export function MentionTextarea({
   value,
+  mentions,
   onChange,
   placeholder,
   rows = 4,
@@ -76,7 +83,6 @@ export function MentionTextarea({
   const [open, setOpen] = useState(false);
   const queryRef = useRef("");
 
-  // Debounce / latest-only the suggestion search.
   useEffect(() => {
     if (!trigger) {
       setOpen(false);
@@ -93,7 +99,6 @@ export function MentionTextarea({
     }
     const handle = setTimeout(async () => {
       const res = await searchProfilesForMentionAction(q);
-      // Drop stale results.
       if (queryRef.current !== q) return;
       setSuggestions(res);
       setActiveIdx(0);
@@ -107,26 +112,33 @@ export function MentionTextarea({
       if (!trigger) return;
       const ta = ref.current;
       const before = value.slice(0, trigger.start);
-      const after = value.slice((ta?.selectionEnd ?? trigger.start + trigger.query.length + 1));
-      const marker = buildMentionMarker(s.id, s.name);
-      const next = `${before}${marker} ${after}`;
-      onChange(next);
+      const caretEnd =
+        ta?.selectionEnd ?? trigger.start + trigger.query.length + 1;
+      const after = value.slice(caretEnd);
+      const cleanName = sanitizeMentionName(s.name) || "alum";
+      const insertText = `@${cleanName} `;
+      const next = `${before}${insertText}${after}`;
+      const nextMentions = pruneMentions(next, [
+        ...mentions.filter((m) => m.profileId !== s.id),
+        { profileId: s.id, name: cleanName },
+      ]);
+      onChange(next, nextMentions);
       setTrigger(null);
       setOpen(false);
-      // Move caret to just after the inserted marker (+ trailing space).
       requestAnimationFrame(() => {
         if (!ta) return;
-        const caret = before.length + marker.length + 1;
+        const caret = before.length + insertText.length;
         ta.focus();
         ta.setSelectionRange(caret, caret);
       });
     },
-    [trigger, value, onChange],
+    [trigger, value, mentions, onChange],
   );
 
   function handleChange(e: ChangeEvent<HTMLTextAreaElement>) {
     const next = e.target.value;
-    onChange(next);
+    const nextMentions = pruneMentions(next, mentions);
+    onChange(next, nextMentions);
     const caret = e.target.selectionStart ?? next.length;
     setTrigger(detectTrigger(next, caret));
   }
@@ -157,10 +169,6 @@ export function MentionTextarea({
     }
   }
 
-  // Render a faint "preview" of any committed mentions above the textarea so
-  // users can see what got linked. Only show when the value contains markers.
-  const preview = parseMentionTokens(value).filter((t) => t.kind === "mention");
-
   return (
     <div className="relative">
       <textarea
@@ -176,27 +184,24 @@ export function MentionTextarea({
         onKeyUp={handleKeyUp}
         onKeyDown={handleKeyDown}
         onBlur={() => {
-          // Defer so a click on a suggestion still registers.
           setTimeout(() => setOpen(false), 120);
         }}
       />
       {hint && <p className="help">{hint}</p>}
 
-      {preview.length > 0 && (
+      {mentions.length > 0 && (
         <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-[var(--color-caz-muted)]">
           <span className="uppercase tracking-wider text-[var(--color-caz-gold)]">
             Linked
           </span>
-          {preview.map((m, i) =>
-            m.kind === "mention" ? (
-              <span
-                key={`${m.profileId}-${i}`}
-                className="rounded-full bg-[var(--color-caz-cream-soft)] px-2 py-0.5 text-[var(--color-caz-green-darker)]"
-              >
-                @{m.name}
-              </span>
-            ) : null,
-          )}
+          {mentions.map((m) => (
+            <span
+              key={m.profileId}
+              className="rounded-full bg-[var(--color-caz-cream-soft)] px-2 py-0.5 text-[var(--color-caz-green-darker)]"
+            >
+              @{m.name}
+            </span>
+          ))}
         </div>
       )}
 
@@ -220,7 +225,6 @@ export function MentionTextarea({
                     role="option"
                     aria-selected={i === activeIdx}
                     onMouseDown={(e) => {
-                      // Prevent textarea blur from racing the click.
                       e.preventDefault();
                       insertMention(s);
                     }}
