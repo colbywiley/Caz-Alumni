@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { getCurrentProfile } from "@/lib/auth";
 import { inviteSchema } from "@/lib/validators/invite";
 import { renderInviteEmail } from "@/lib/email/inviteTemplate";
+import { getSiteUrl } from "@/lib/siteUrl";
 
 export const runtime = "nodejs";
 
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const siteUrl = getSiteUrl();
   const inviterName = profile.display_name || profile.full_name || "A Caz alum";
   const replyTo = profile.email ?? undefined;
   const resend = new Resend(apiKey);
