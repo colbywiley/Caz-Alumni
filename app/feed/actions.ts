@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { extractMentionedProfileIds, mentionsToPlainText } from "@/lib/feed/mentions";
+import {
+  CAZ_ALUMNI_MENTION_ID,
+  CAZ_ALUMNI_MENTION_NAME,
+  extractMentionedProfileIds,
+  mentionsToPlainText,
+  stripCazAlumniMention,
+} from "@/lib/feed/mentions";
 import { renderPostMentionEmail } from "@/lib/email/postMentionTemplate";
 import { getSiteUrl } from "@/lib/siteUrl";
 
@@ -28,7 +34,7 @@ export async function createPostAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return err("Sign in to post.");
 
-  const content = (input.content ?? "").trim();
+  let content = (input.content ?? "").trim();
   const imageUrls = (input.image_urls ?? []).filter(
     (u) => typeof u === "string" && u.length > 0,
   );
@@ -42,6 +48,9 @@ export async function createPostAction(input: {
   if (imageUrls.length > MAX_IMAGES) {
     return err(`You can attach up to ${MAX_IMAGES} photos.`);
   }
+
+  const isAdmin = await isUserAdmin(supabase, user.id);
+  if (!isAdmin) content = stripCazAlumniMention(content);
 
   const { data: post, error } = await supabase
     .from("feed_posts")
@@ -59,6 +68,7 @@ export async function createPostAction(input: {
     postId: post.id,
     content,
     surface: "post",
+    actorIsAdmin: isAdmin,
   }).catch((e) => console.error("notifyMentions(post) failed:", e));
 
   revalidatePath("/feed");
@@ -124,11 +134,14 @@ export async function createCommentAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return err("Sign in to comment.");
 
-  const content = (input.content ?? "").trim();
+  let content = (input.content ?? "").trim();
   if (content.length === 0) return err("Comment can't be empty.");
   if (content.length > MAX_CONTENT) {
     return err(`Comments are limited to ${MAX_CONTENT} characters.`);
   }
+
+  const isAdmin = await isUserAdmin(supabase, user.id);
+  if (!isAdmin) content = stripCazAlumniMention(content);
 
   const { data: comment, error } = await supabase
     .from("feed_post_comments")
@@ -146,6 +159,7 @@ export async function createCommentAction(input: {
     postId: input.postId,
     content,
     surface: "comment",
+    actorIsAdmin: isAdmin,
   }).catch((e) => console.error("notifyMentions(comment) failed:", e));
 
   revalidatePath("/feed");
@@ -171,9 +185,16 @@ export async function deleteCommentAction(
   return { ok: true };
 }
 
-export async function searchProfilesForMentionAction(query: string): Promise<
-  Array<{ id: string; name: string; avatar_url: string | null }>
-> {
+export type MentionSuggestion = {
+  id: string;
+  name: string;
+  avatar_url: string | null;
+  is_broadcast?: boolean;
+};
+
+export async function searchProfilesForMentionAction(
+  query: string,
+): Promise<MentionSuggestion[]> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -192,13 +213,45 @@ export async function searchProfilesForMentionAction(query: string): Promise<
     .eq("show_in_directory", true)
     .or(`full_name.ilike.${pattern},display_name.ilike.${pattern}`)
     .limit(8);
-  if (error || !data) return [];
 
-  return data.map((p) => ({
-    id: p.id,
-    name: p.display_name || p.full_name || "Caz alum",
-    avatar_url: p.avatar_url,
-  }));
+  const profiles: MentionSuggestion[] =
+    error || !data
+      ? []
+      : data.map((p) => ({
+          id: p.id,
+          name: p.display_name || p.full_name || "Caz alum",
+          avatar_url: p.avatar_url,
+        }));
+
+  // Admins get a broadcast option that pins to the top whenever the typed
+  // query is a prefix of "cazalumni".
+  if (CAZ_ALUMNI_MENTION_NAME.startsWith(q.toLowerCase())) {
+    if (await isUserAdmin(supabase, user.id)) {
+      return [
+        {
+          id: CAZ_ALUMNI_MENTION_ID,
+          name: CAZ_ALUMNI_MENTION_NAME,
+          avatar_url: null,
+          is_broadcast: true,
+        },
+        ...profiles,
+      ];
+    }
+  }
+
+  return profiles;
+}
+
+async function isUserAdmin(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userId: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", userId)
+    .maybeSingle();
+  return Boolean(data?.is_admin);
 }
 
 // ===========================================================================
@@ -210,10 +263,14 @@ async function notifyMentions(args: {
   postId: string;
   content: string;
   surface: "post" | "comment";
+  actorIsAdmin: boolean;
 }) {
-  const mentionedIds = extractMentionedProfileIds(args.content)
-    .filter((id) => id !== args.actorId);
-  if (mentionedIds.length === 0) return;
+  const rawIds = extractMentionedProfileIds(args.content);
+  const broadcast = args.actorIsAdmin && rawIds.includes(CAZ_ALUMNI_MENTION_ID);
+  const directIds = rawIds.filter(
+    (id) => id !== args.actorId && id !== CAZ_ALUMNI_MENTION_ID,
+  );
+  if (!broadcast && directIds.length === 0) return;
 
   const supabase = await createSupabaseServerClient();
 
@@ -224,10 +281,15 @@ async function notifyMentions(args: {
     .maybeSingle();
   if (!actor) return;
 
-  const { data: recipients } = await supabase
+  let recipientQuery = supabase
     .from("profiles")
-    .select("id, full_name, display_name, email, notify_on_post_tag")
-    .in("id", mentionedIds);
+    .select("id, full_name, display_name, email, notify_on_post_tag");
+  if (broadcast) {
+    recipientQuery = recipientQuery.neq("id", args.actorId);
+  } else {
+    recipientQuery = recipientQuery.in("id", directIds);
+  }
+  const { data: recipients } = await recipientQuery;
   if (!recipients || recipients.length === 0) return;
 
   const notifType = args.surface === "post" ? "post_tag" : "comment_tag";

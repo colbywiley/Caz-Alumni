@@ -19,6 +19,7 @@ type Suggestion = {
   id: string;
   name: string;
   avatar_url: string | null;
+  is_broadcast?: boolean;
 };
 
 type Props = {
@@ -236,7 +237,11 @@ export function MentionTextarea({
                     }`}
                   >
                     <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full bg-[var(--color-caz-cream-soft)]">
-                      {s.avatar_url ? (
+                      {s.is_broadcast ? (
+                        <span className="flex h-full w-full items-center justify-center text-xs font-bold text-[var(--color-caz-gold)]">
+                          @
+                        </span>
+                      ) : s.avatar_url ? (
                         <Image
                           src={s.avatar_url}
                           alt=""
@@ -250,8 +255,15 @@ export function MentionTextarea({
                         </span>
                       )}
                     </span>
-                    <span className="truncate font-medium text-[var(--color-caz-ink)]">
-                      {s.name}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium text-[var(--color-caz-ink)]">
+                        {s.name}
+                      </span>
+                      {s.is_broadcast && (
+                        <span className="block truncate text-[11px] text-[var(--color-caz-muted)]">
+                          Notify every alum (admin)
+                        </span>
+                      )}
                     </span>
                   </button>
                 </li>
