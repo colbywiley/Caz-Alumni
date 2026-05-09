@@ -15,6 +15,27 @@ const MENTION_RE = new RegExp(
   "gi",
 );
 
+// Sentinel id used by the admin-only "@cazalumni" mention that broadcasts a
+// notification to every alum. Picked as an all-`c` hex string so it parses
+// through the same UUID regex as a real profile id.
+export const CAZ_ALUMNI_MENTION_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+export const CAZ_ALUMNI_MENTION_NAME = "cazalumni";
+
+export function isCazAlumniMentionId(id: string): boolean {
+  return id.toLowerCase() === CAZ_ALUMNI_MENTION_ID;
+}
+
+// Removes any `@[name](sentinel-uuid)` markers from content, replacing them
+// with the plain `@name` text. Used to defang the broadcast mention on the
+// server when a non-admin tries to use it.
+export function stripCazAlumniMention(content: string): string {
+  const re = new RegExp(
+    String.raw`@\[([^\]]{1,80})\]\(${CAZ_ALUMNI_MENTION_ID}\)`,
+    "gi",
+  );
+  return content.replace(re, (_full, name: string) => `@${name}`);
+}
+
 export type ParsedMentionToken =
   | { kind: "text"; text: string }
   | { kind: "mention"; profileId: string; name: string };
