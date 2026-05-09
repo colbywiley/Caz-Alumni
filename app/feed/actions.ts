@@ -255,7 +255,7 @@ async function notifyMentions(args: {
   }
 
   const siteUrl = getSiteUrl();
-  const postUrl = `${siteUrl}/feed#post-${args.postId}`;
+  const postUrl = `${siteUrl}/login?next=${encodeURIComponent(`/feed#post-${args.postId}`)}`;
   const actorName = actor.display_name || actor.full_name || "A Caz alum";
   const preview = mentionsToPlainText(args.content);
   const resend = new Resend(apiKey);

@@ -105,7 +105,7 @@ async function notifyFriendAdded(actorId: string, recipientId: string) {
   if (!recipient.email) return;
 
   const siteUrl = getSiteUrl();
-  const profileUrl = `${siteUrl}/directory/${actor.id}`;
+  const profileUrl = `${siteUrl}/login?next=${encodeURIComponent(`/directory/${actor.id}`)}`;
   const frienderName = actor.display_name || actor.full_name || "A Caz alum";
   const recipientName = recipient.display_name || recipient.full_name || "there";
 
